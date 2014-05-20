@@ -121,6 +121,9 @@ pages_purge(void *addr, size_t length)
 #ifdef _WIN32
 	VirtualAlloc(addr, length, MEM_RESET, PAGE_READWRITE);
 	unzeroed = true;
+#elif !defined(__USE_BSD)
+        /* PNaCl/newlib doesn't have madvise. Nothing to do. */
+        unzeroed = true;
 #else
 #  ifdef JEMALLOC_PURGE_MADVISE_DONTNEED
 #    define JEMALLOC_MADV_PURGE MADV_DONTNEED

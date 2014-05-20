@@ -1148,24 +1148,6 @@ elif test "x${force_tls}" = "x1" ; then
 fi
 
 dnl ============================================================================
-dnl Check for ffsl(3), and fail if not found.  This function exists on all
-dnl platforms that jemalloc currently has a chance of functioning on without
-dnl modification.
-JE_COMPILABLE([a program using ffsl], [
-#include <stdio.h>
-#include <strings.h>
-#include <string.h>
-], [
-	{
-		int rv = ffsl(0x08);
-		printf("%d\n", rv);
-	}
-], [je_cv_function_ffsl])
-if test "x${je_cv_function_ffsl}" != "xyes" ; then
-   AC_MSG_ERROR([Cannot build without ffsl(3)])
-fi
-
-dnl ============================================================================
 dnl Check for atomic(9) operations as provided on FreeBSD.
 
 JE_COMPILABLE([atomic(9)], [
