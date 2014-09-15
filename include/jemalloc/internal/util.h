@@ -27,13 +27,21 @@
 #  define JEMALLOC_CC_SILENCE_INIT(v)
 #endif
 
+#ifdef __GNUC__
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+#else
+#define likely(x) !!(x)
+#define unlikely(x) !!(x)
+#endif
+
 /*
  * Define a custom assert() in order to reduce the chances of deadlock during
  * assertion failure.
  */
 #ifndef assert
 #define	assert(e) do {							\
-	if (config_debug && !(e)) {					\
+	if (unlikely(config_debug && !(e))) {				\
 		malloc_printf(						\
 		    "<jemalloc>: %s:%d: Failed assertion: \"%s\"\n",	\
 		    __FILE__, __LINE__, #e);				\
@@ -65,14 +73,14 @@
 
 #ifndef assert_not_implemented
 #define	assert_not_implemented(e) do {					\
-	if (config_debug && !(e))					\
+	if (unlikely(config_debug && !(e)))				\
 		not_implemented();					\
 } while (0)
 #endif
 
 /* Use to assert a particular configuration, e.g., cassert(config_debug). */
 #define	cassert(c) do {							\
-	if ((c) == false)						\
+	if (unlikely(!(c)))						\
 		not_reached();						\
 } while (0)
 

@@ -202,6 +202,7 @@ cat <<EOF
  *   LG_TINY_MAXCLASS: Lg of maximum tiny size class.
  *   LOOKUP_MAXCLASS: Maximum size class included in lookup table.
  *   SMALL_MAXCLASS: Maximum small size class.
+ *   LARGE_MINCLASS: Minimum large size class.
  */
 
 #define	LG_SIZE_CLASS_GROUP	${lg_g}
@@ -240,11 +241,13 @@ cat <<EOF
  * The small_size2bin lookup table uses uint8_t to encode each bin index, so we
  * cannot support more than 256 small size classes.  Further constrain NBINS to
  * 255 since all small size classes, plus a "not small" size class must be
- * stored in 8 bits of arena_chunk_map_t's bits field.
+ * stored in 8 bits of arena_chunk_map_bits_t's bits field.
  */
 #if (NBINS > 255)
 #  error "Too many small size classes"
 #endif
+
+#define	LARGE_MINCLASS (PAGE_CEILING(SMALL_MAXCLASS+1))
 
 #endif /* JEMALLOC_H_TYPES */
 /******************************************************************************/
