@@ -354,6 +354,11 @@ case "${host}" in
 	SOREV="${so}"
 	PIC_CFLAGS=""
 	;;
+  *-*-nacl*)
+        CFLAGS="$CFLAGS"
+        AC_DEFINE([JEMALLOC_PURGE_MADVISE_DONTNEED], [ ])
+        abi="elf"
+        ;;
   *)
 	AC_MSG_RESULT([Unsupported operating system: ${host}])
 	abi="elf"
