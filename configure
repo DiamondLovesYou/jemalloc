@@ -771,6 +771,11 @@ enable_fill
 enable_utrace
 enable_valgrind
 enable_xmalloc
+with_lg_tiny_min
+with_lg_quantum
+with_lg_page
+with_lg_page_sizes
+with_lg_size_class_group
 enable_lazy_lock
 enable_tls
 enable_zone_allocator
@@ -1433,6 +1438,16 @@ Optional Packages:
   --with-static-libunwind=<libunwind.a>
                           Path to static libunwind library; use rather than
                           dynamically linking
+  --with-lg-tiny-min=<lg-tiny-min>
+                          Base 2 log of minimum tiny size class to support
+  --with-lg-quantum=<lg-quantum>
+                          Base 2 log of minimum allocation alignment
+  --with-lg-page=<lg-page>
+                          Base 2 log of system page size
+  --with-lg-page-sizes=<lg-page-sizes>
+                          Base 2 logs of system page sizes to support
+  --with-lg-size-class-group=<lg-size-class-group>
+                          Base 2 log of size classes per doubling
 
 Some influential environment variables:
   CC          C compiler command
@@ -4653,9 +4668,10 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 
 CPU_SPINWAIT=""
 case "${host_cpu}" in
-  i[345]86)
-	;;
   i686|x86_64)
+	if ${je_cv_pause+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether pause instruction is compilable" >&5
 $as_echo_n "checking whether pause instruction is compilable... " >&6; }
@@ -4684,44 +4700,10 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $je_cv_pause" >&5
 $as_echo "$je_cv_pause" >&6; }
 
+fi
+
 	if test "x${je_cv_pause}" = "xyes" ; then
 	    CPU_SPINWAIT='__asm__ volatile("pause")'
-	fi
-
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether SSE2 intrinsics is compilable" >&5
-$as_echo_n "checking whether SSE2 intrinsics is compilable... " >&6; }
-if ${je_cv_sse2+:} false; then :
-  $as_echo_n "(cached) " >&6
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-
-#include <emmintrin.h>
-
-int
-main ()
-{
-
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_link "$LINENO"; then :
-  je_cv_sse2=yes
-else
-  je_cv_sse2=no
-fi
-rm -f core conftest.err conftest.$ac_objext \
-    conftest$ac_exeext conftest.$ac_ext
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $je_cv_sse2" >&5
-$as_echo "$je_cv_sse2" >&6; }
-
-	if test "x${je_cv_sse2}" = "xyes" ; then
-	  cat >>confdefs.h <<_ACEOF
-#define HAVE_SSE2
-_ACEOF
-
 	fi
 	;;
   powerpc)
@@ -4940,7 +4922,7 @@ $as_echo "$abi" >&6; }
 	fi
 	abi="xcoff"
 	;;
-  *-*-mingw*)
+  *-*-mingw* | *-*-cygwin*)
 	abi="pecoff"
 	force_tls="0"
 	RPATH=""
@@ -4964,6 +4946,12 @@ $as_echo "$abi" >&6; }
 	SOREV="${so}"
 	PIC_CFLAGS=""
 	;;
+  *-*-nacl*)
+        CFLAGS="$CFLAGS"
+        $as_echo "#define JEMALLOC_PURGE_MADVISE_DONTNEED  " >>confdefs.h
+
+        abi="elf"
+        ;;
   *)
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: Unsupported operating system: ${host}" >&5
 $as_echo "Unsupported operating system: ${host}" >&6; }
@@ -5158,7 +5146,7 @@ int
 main ()
 {
 static __thread int
-               __attribute__((tls_model("initial-exec"))) foo;
+               __attribute__((tls_model("initial-exec"), unused)) foo;
                foo = 0;
   ;
   return 0;
@@ -5673,6 +5661,7 @@ je_="je_"
 
 
 cfgoutputs_in="Makefile.in"
+cfgoutputs_in="${cfgoutputs_in} jemalloc.pc.in"
 cfgoutputs_in="${cfgoutputs_in} doc/html.xsl.in"
 cfgoutputs_in="${cfgoutputs_in} doc/manpages.xsl.in"
 cfgoutputs_in="${cfgoutputs_in} doc/jemalloc.xml.in"
@@ -5684,6 +5673,7 @@ cfgoutputs_in="${cfgoutputs_in} test/test.sh.in"
 cfgoutputs_in="${cfgoutputs_in} test/include/test/jemalloc_test.h.in"
 
 cfgoutputs_out="Makefile"
+cfgoutputs_out="${cfgoutputs_out} jemalloc.pc"
 cfgoutputs_out="${cfgoutputs_out} doc/html.xsl"
 cfgoutputs_out="${cfgoutputs_out} doc/manpages.xsl"
 cfgoutputs_out="${cfgoutputs_out} doc/jemalloc.xml"
@@ -5695,6 +5685,7 @@ cfgoutputs_out="${cfgoutputs_out} test/test.sh"
 cfgoutputs_out="${cfgoutputs_out} test/include/test/jemalloc_test.h"
 
 cfgoutputs_tup="Makefile"
+cfgoutputs_tup="${cfgoutputs_tup} jemalloc.pc:jemalloc.pc.in"
 cfgoutputs_tup="${cfgoutputs_tup} doc/html.xsl:doc/html.xsl.in"
 cfgoutputs_tup="${cfgoutputs_tup} doc/manpages.xsl:doc/manpages.xsl.in"
 cfgoutputs_tup="${cfgoutputs_tup} doc/jemalloc.xml:doc/jemalloc.xml.in"
@@ -6230,11 +6221,6 @@ $as_echo_n "checking configured backtracing method... " >&6; }
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $backtrace_method" >&5
 $as_echo "$backtrace_method" >&6; }
 if test "x$enable_prof" = "x1" ; then
-  if test "x${force_tls}" = "x0" ; then
-    as_fn_error $? "Heap profiling requires TLS" "$LINENO" 5;
-  fi
-  force_tls="1"
-
   if test "x$abi" != "xpecoff"; then
         LIBS="$LIBS -lm"
   fi
@@ -6550,13 +6536,50 @@ $as_echo "$je_cv_function_ffsl" >&6; }
   fi
 fi
 
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking STATIC_PAGE_SHIFT" >&5
-$as_echo_n "checking STATIC_PAGE_SHIFT... " >&6; }
-if ${je_cv_static_page_shift+:} false; then :
+
+# Check whether --with-lg_tiny_min was given.
+if test "${with_lg_tiny_min+set}" = set; then :
+  withval=$with_lg_tiny_min; LG_TINY_MIN="$with_lg_tiny_min"
+else
+  LG_TINY_MIN="3"
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define LG_TINY_MIN $LG_TINY_MIN
+_ACEOF
+
+
+
+# Check whether --with-lg_quantum was given.
+if test "${with_lg_quantum+set}" = set; then :
+  withval=$with_lg_quantum; LG_QUANTA="$with_lg_quantum"
+else
+  LG_QUANTA="3 4"
+fi
+
+if test "x$with_lg_quantum" != "x" ; then
+  cat >>confdefs.h <<_ACEOF
+#define LG_QUANTUM $with_lg_quantum
+_ACEOF
+
+fi
+
+
+# Check whether --with-lg_page was given.
+if test "${with_lg_page+set}" = set; then :
+  withval=$with_lg_page; LG_PAGE="$with_lg_page"
+else
+  LG_PAGE="detect"
+fi
+
+if test "x$LG_PAGE" == "xdetect"; then
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking LG_PAGE" >&5
+$as_echo_n "checking LG_PAGE... " >&6; }
+if ${je_cv_lg_page+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   if test "$cross_compiling" = yes; then :
-  je_cv_static_page_shift=12
+  je_cv_lg_page=12
 else
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -6602,26 +6625,47 @@ main ()
 }
 _ACEOF
 if ac_fn_c_try_run "$LINENO"; then :
-  je_cv_static_page_shift=`cat conftest.out`
+  je_cv_lg_page=`cat conftest.out`
 else
-  je_cv_static_page_shift=undefined
+  je_cv_lg_page=undefined
 fi
 rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
   conftest.$ac_objext conftest.beam conftest.$ac_ext
 fi
 
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $je_cv_static_page_shift" >&5
-$as_echo "$je_cv_static_page_shift" >&6; }
-
-if test "x$je_cv_static_page_shift" != "xundefined"; then
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $je_cv_lg_page" >&5
+$as_echo "$je_cv_lg_page" >&6; }
+fi
+if test "x${je_cv_lg_page}" != "x" ; then
+  LG_PAGE="${je_cv_lg_page}"
+fi
+if test "x${LG_PAGE}" != "xundefined" ; then
    cat >>confdefs.h <<_ACEOF
-#define STATIC_PAGE_SHIFT $je_cv_static_page_shift
+#define LG_PAGE $LG_PAGE
 _ACEOF
 
 else
-   as_fn_error $? "cannot determine value for STATIC_PAGE_SHIFT" "$LINENO" 5
+   as_fn_error $? "cannot determine value for LG_PAGE" "$LINENO" 5
 fi
+
+
+# Check whether --with-lg_page_sizes was given.
+if test "${with_lg_page_sizes+set}" = set; then :
+  withval=$with_lg_page_sizes; LG_PAGE_SIZES="$with_lg_page_sizes"
+else
+  LG_PAGE_SIZES="$LG_PAGE"
+fi
+
+
+
+# Check whether --with-lg_size_class_group was given.
+if test "${with_lg_size_class_group+set}" = set; then :
+  withval=$with_lg_size_class_group; LG_SIZE_CLASS_GROUP="$with_lg_size_class_group"
+else
+  LG_SIZE_CLASS_GROUP="2"
+fi
+
 
 
 if test "x`git rev-parse --is-inside-work-tree 2>/dev/null`" = "xtrue" ; then
@@ -7311,7 +7355,7 @@ $as_echo_n "checking malloc zone version... " >&6; }
 int
 main ()
 {
-static foo[sizeof(malloc_zone_t) == sizeof(void *) * 14 ? 1 : -1]
+static int foo[sizeof(malloc_zone_t) == sizeof(void *) * 14 ? 1 : -1]
 
   ;
   return 0;
@@ -7327,7 +7371,7 @@ else
 int
 main ()
 {
-static foo[sizeof(malloc_zone_t) == sizeof(void *) * 15 ? 1 : -1]
+static int foo[sizeof(malloc_zone_t) == sizeof(void *) * 15 ? 1 : -1]
 
   ;
   return 0;
@@ -7343,7 +7387,7 @@ else
 int
 main ()
 {
-static foo[sizeof(malloc_zone_t) == sizeof(void *) * 16 ? 1 : -1]
+static int foo[sizeof(malloc_zone_t) == sizeof(void *) * 16 ? 1 : -1]
 
   ;
   return 0;
@@ -7357,7 +7401,7 @@ if ac_fn_c_try_compile "$LINENO"; then :
 int
 main ()
 {
-static foo[sizeof(malloc_introspection_t) == sizeof(void *) * 9 ? 1 : -1]
+static int foo[sizeof(malloc_introspection_t) == sizeof(void *) * 9 ? 1 : -1]
 
   ;
   return 0;
@@ -7373,7 +7417,7 @@ else
 int
 main ()
 {
-static foo[sizeof(malloc_introspection_t) == sizeof(void *) * 13 ? 1 : -1]
+static int foo[sizeof(malloc_introspection_t) == sizeof(void *) * 13 ? 1 : -1]
 
   ;
   return 0;
@@ -7396,7 +7440,7 @@ else
 int
 main ()
 {
-static foo[sizeof(malloc_zone_t) == sizeof(void *) * 17 ? 1 : -1]
+static int foo[sizeof(malloc_zone_t) == sizeof(void *) * 17 ? 1 : -1]
 
   ;
   return 0;
@@ -7412,7 +7456,7 @@ else
 int
 main ()
 {
-static foo[sizeof(malloc_zone_t) > sizeof(void *) * 17 ? 1 : -1]
+static int foo[sizeof(malloc_zone_t) > sizeof(void *) * 17 ? 1 : -1]
 
   ;
   return 0;
@@ -7534,6 +7578,46 @@ $as_echo "$je_cv_glibc_memalign_hook" >&6; }
 
 if test "x${je_cv_glibc_memalign_hook}" = "xyes" ; then
   $as_echo "#define JEMALLOC_GLIBC_MEMALIGN_HOOK  " >>confdefs.h
+
+fi
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking whether pthreads adaptive mutexes is compilable" >&5
+$as_echo_n "checking whether pthreads adaptive mutexes is compilable... " >&6; }
+if ${je_cv_pthread_mutex_adaptive_np+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+#include <pthread.h>
+
+int
+main ()
+{
+
+  pthread_mutexattr_t attr;
+  pthread_mutexattr_init(&attr);
+  pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP);
+  pthread_mutexattr_destroy(&attr);
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  je_cv_pthread_mutex_adaptive_np=yes
+else
+  je_cv_pthread_mutex_adaptive_np=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $je_cv_pthread_mutex_adaptive_np" >&5
+$as_echo "$je_cv_pthread_mutex_adaptive_np" >&6; }
+
+if test "x${je_cv_pthread_mutex_adaptive_np}" = "xyes" ; then
+  $as_echo "#define JEMALLOC_HAVE_PTHREAD_MUTEX_ADAPTIVE_NP  " >>confdefs.h
 
 fi
 
@@ -8381,6 +8465,10 @@ cat >>$CONFIG_STATUS <<_ACEOF || ac_write_fail=1
 
   srcdir="${srcdir}"
   objroot="${objroot}"
+  LG_QUANTA="${LG_QUANTA}"
+  LG_TINY_MIN=${LG_TINY_MIN}
+  LG_PAGE_SIZES="${LG_PAGE_SIZES}"
+  LG_SIZE_CLASS_GROUP=${LG_SIZE_CLASS_GROUP}
 
 
   srcdir="${srcdir}"
@@ -9016,7 +9104,7 @@ $as_echo "$as_me: executing $ac_file commands" >&6;}
  ;;
     "include/jemalloc/internal/size_classes.h":C)
   mkdir -p "${objroot}include/jemalloc/internal"
-  "${srcdir}/include/jemalloc/internal/size_classes.sh" > "${objroot}include/jemalloc/internal/size_classes.h"
+  "${srcdir}/include/jemalloc/internal/size_classes.sh" "${LG_QUANTA}" ${LG_TINY_MIN} "${LG_PAGE_SIZES}" ${LG_SIZE_CLASS_GROUP} > "${objroot}include/jemalloc/internal/size_classes.h"
  ;;
     "include/jemalloc/jemalloc_protos_jet.h":C)
   mkdir -p "${objroot}include/jemalloc"
