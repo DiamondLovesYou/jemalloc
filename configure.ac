@@ -346,7 +346,7 @@ case "${host}" in
 	PIC_CFLAGS=""
 	;;
   *-*-nacl*)
-        CFLAGS="$CFLAGS"
+        CFLAGS="$CFLAGS -DPTHREAD_MUTEX_DEFAULT=PTHREAD_MUTEX_TIMED_NP"
         AC_DEFINE([JEMALLOC_PURGE_MADVISE_DONTNEED], [ ])
         abi="elf"
         ;;
