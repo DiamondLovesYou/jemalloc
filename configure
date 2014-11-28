@@ -4947,7 +4947,7 @@ $as_echo "$abi" >&6; }
 	PIC_CFLAGS=""
 	;;
   *-*-nacl*)
-        CFLAGS="$CFLAGS"
+        CFLAGS="$CFLAGS -DPTHREAD_MUTEX_DEFAULT=PTHREAD_MUTEX_TIMED_NP"
         $as_echo "#define JEMALLOC_PURGE_MADVISE_DONTNEED  " >>confdefs.h
 
         abi="elf"
